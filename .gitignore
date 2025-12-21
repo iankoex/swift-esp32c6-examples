@@ -1,0 +1,6 @@
+.cache*
+build*
+dependencies.lock
+diagram.json
+sdkconfig
+.DS_Store
