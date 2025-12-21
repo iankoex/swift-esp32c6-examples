@@ -4,3 +4,5 @@ dependencies.lock
 diagram.json
 sdkconfig
 .DS_Store
+managed_components*
+sdkconfig.old
