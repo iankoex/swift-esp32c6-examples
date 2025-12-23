@@ -1,10 +1,26 @@
+/// A utility struct for scanning nearby Wi-Fi access points on ESP32 devices using ESP-IDF.
+///
+/// This struct provides an interface to initialize the Wi-Fi stack and perform scans for available networks.
+/// It wraps ESP-IDF's Wi-Fi scanning APIs, handling initialization of NVS flash and Wi-Fi components.
+///
+/// - Note: Scanning is a blocking operation and may take several seconds. Ensure the device is in station mode.
+/// - Important: This struct is not thread-safe; avoid concurrent scans.
 struct WIFIScanner {
 
+    /// Initializes the Wi-Fi scanner by setting up the NVS flash and Wi-Fi stack.
+    ///
+    /// This initializer configures the ESP-IDF NVS flash storage and prepares the Wi-Fi interface for scanning.
+    /// It must be called before performing any scans. If initialization fails, the program will terminate.
+    ///
+    /// - Warning: Call this initializer only once per application run, as re-initialization may cause issues.
     init() {
         initializeNVSFlash()
         initializeWIFI()
     }
 
+    /// Initializes the NVS (Non-Volatile Storage) flash for Wi-Fi configuration persistence.
+    ///
+    /// This method sets up or erases NVS flash if needed, ensuring Wi-Fi settings can be stored.
     private func initializeNVSFlash() {
         var error: esp_err_t = nvs_flash_init()
         if error == ESP_ERR_NVS_NO_FREE_PAGES || error == ESP_ERR_NVS_NEW_VERSION_FOUND {
@@ -16,6 +32,9 @@ struct WIFIScanner {
         }
     }
 
+    /// Initializes the Wi-Fi stack and event loop for ESP-IDF.
+    ///
+    /// This method sets up the default Wi-Fi station interface and event handling loop.
     private func initializeWIFI() {
         guard esp_netif_init() == ESP_OK else {
             fatalError("failed to init")
@@ -35,7 +54,26 @@ struct WIFIScanner {
         }
     }
 
-    // maxAccessPointsCount is just a suggestion the actual number maybe lower
+    /// Scans for nearby Wi-Fi access points and returns their details.
+    ///
+    /// This method performs a Wi-Fi scan in station mode, retrieving information about available networks.
+    /// The scan is blocking and may take a few seconds to complete. Progress is printed to the console.
+    ///
+    /// - Parameter maxAccessPointsCount: The maximum number of access points to retrieve (default: 3).
+    ///   This is a suggestion; the actual number returned may be lower due to scan results or hardware limits.
+    /// - Returns: An array of `WIFIAccessPointRecord` containing details of the scanned access points.
+    ///
+    /// - Note: The device must be initialized via this struct's initializer before calling this method.
+    /// - Warning: If the scan fails, the program will terminate with a fatal error.
+    ///
+    /// ## Example
+    /// ```swift
+    /// let scanner = WIFIScanner()
+    /// let accessPoints = scanner.scanAccessPoints(maxAccessPointsCount: 5)
+    /// for ap in accessPoints {
+    ///     print("SSID: \(ap.ssid), RSSI: \(ap.rssi)")
+    /// }
+    /// ```
     func scanAccessPoints(maxAccessPointsCount: Int = 3) -> [WIFIAccessPointRecord] {
         var number_of_access_points: UInt16 = UInt16(maxAccessPointsCount)
         let ap_info_array: UnsafeMutablePointer<wifi_ap_record_t> = .allocate(

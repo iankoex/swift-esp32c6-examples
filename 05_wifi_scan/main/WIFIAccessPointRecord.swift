@@ -1,16 +1,51 @@
+/// Use this to access details about nearby Wi-Fi networks, such as their name, signal strength, and security.
 struct WIFIAccessPointRecord {
+    /// The AP's MAC address as a hex string (e.g., "AABBCCDDEEFF").
     let bssid: String
-    let ssid: String
-    let primaryChannel: Int
-    let secondaryChannel: SecondaryChannel
-    let rssi: Int
-    let authMode: AuthMode
-    let pairwiseCipher: CipherType
-    let groupCipher: CipherType
-    let antenna: Int
-    let bandwith: Bandwidth
-    // let phyFlags: PHYFlags
 
+    /// The AP's network name (SSID) as a string.
+    let ssid: String
+
+    /// The primary Wi-Fi channel number (e.g., 1-14 for 2.4GHz).
+    let primaryChannel: Int
+
+    /// Secondary channel info for wider bandwidth (e.g., above or below primary).
+    let secondaryChannel: SecondaryChannel
+
+    /// Signal strength in dBm (negative values; stronger signal = less negative).
+    let rssi: Int
+
+    /// Authentication/security mode (e.g., WPA2, open network)..
+    let authMode: AuthMode
+
+    /// Encryption type for pairwise (unicast) traffic.
+    let pairwiseCipher: CipherType
+
+    /// Encryption type for group (multicast/broadcast) traffic.
+    let groupCipher: CipherType
+
+    /// Antenna used for receiving the beacon (0 or 1).
+    let antenna: Int
+
+    /// Bit flags for supported PHY modes and features (e.g., 11b, WPS).
+    let phyFlags: PHYFlags
+
+    /// Channel bandwidth (e.g., 20MHz, 80MHz).
+    let bandwidth: Bandwidth
+
+    /// Country-specific Wi-Fi regulations for this AP.
+    let country: WIFICountry
+
+    /// High-Efficiency (Wi-Fi 6) AP info, like BSS color.
+    let heAPInfo: HEAPInfo
+
+    /// Center channel frequency for 80/160MHz VHT bandwidth.
+    let vhtChannelFreq1: Int
+
+    /// Second segment center frequency for 80+80MHz bandwidth.
+    let vhtChannelFreq2: Int
+
+    /// Creates a Swift record from ESP-IDF's C struct.
     init(_ wifi_ap_record: wifi_ap_record_t) {
         let bssidArray: [UInt8] = withUnsafeBytes(of: wifi_ap_record.bssid) { buffer in
             Array(buffer.bindMemory(to: UInt8.self))
@@ -28,35 +63,60 @@ struct WIFIAccessPointRecord {
         self.rssi = Int(wifi_ap_record.rssi)
         self.authMode = AuthMode(rawValue: wifi_ap_record.authmode.rawValue) ?? .open
         self.pairwiseCipher = CipherType(rawValue: wifi_ap_record.pairwise_cipher.rawValue) ?? .unknown
-        self.groupCipher = CipherType(rawValue: wifi_ap_record.pairwise_cipher.rawValue) ?? .unknown
+        self.groupCipher = CipherType(rawValue: wifi_ap_record.group_cipher.rawValue) ?? .unknown
         self.antenna = Int(wifi_ap_record.ant.rawValue)
-        // self.phyFlags = PHYFlags(rawValue: wifi_ap_record.phy_lr)
-        self.bandwith = Bandwidth(rawValue: wifi_ap_record.bandwidth.rawValue) ?? .ht20bw20  // missleading
+
+        var phyRaw: UInt32 = 0
+        phyRaw |= (wifi_ap_record.phy_11b != 0 ? 1 : 0) << 0
+        phyRaw |= (wifi_ap_record.phy_11g != 0 ? 1 : 0) << 1
+        phyRaw |= (wifi_ap_record.phy_11n != 0 ? 1 : 0) << 2
+        phyRaw |= (wifi_ap_record.phy_lr != 0 ? 1 : 0) << 3
+        phyRaw |= (wifi_ap_record.phy_11a != 0 ? 1 : 0) << 4
+        phyRaw |= (wifi_ap_record.phy_11ac != 0 ? 1 : 0) << 5
+        phyRaw |= (wifi_ap_record.phy_11ax != 0 ? 1 : 0) << 6
+        phyRaw |= (wifi_ap_record.wps != 0 ? 1 : 0) << 7
+        phyRaw |= (wifi_ap_record.ftm_responder != 0 ? 1 : 0) << 8
+        phyRaw |= (wifi_ap_record.ftm_initiator != 0 ? 1 : 0) << 9
+        self.phyFlags = PHYFlags(rawValue: Int(phyRaw))
+
+        self.country = WIFICountry(wifi_ap_record.country)
+        self.heAPInfo = HEAPInfo(wifi_ap_record.he_ap)
+        self.bandwidth = Bandwidth(rawValue: wifi_ap_record.bandwidth.rawValue) ?? .ht20bw20
+        self.vhtChannelFreq1 = Int(wifi_ap_record.vht_ch_freq1)
+        self.vhtChannelFreq2 = Int(wifi_ap_record.vht_ch_freq2)
     }
 }
 
 extension WIFIAccessPointRecord {
+    /// Options for Wi-Fi secondary channels in wider bandwidth modes.
     enum SecondaryChannel: Int {
+        /// The type of raw value this enum uses (matches C's enum).
         typealias RawValue = Int
 
+        /// Initializes from a C UInt32 value.
+        /// C enums are often UInt32, so we convert safely.
+        ///
+        /// - Parameter rawValue: The C enum value.
         init?(rawValue: UInt32) {
             self.init(rawValue: Int(rawValue))
         }
 
-        /// 20 MHz channel width (no secondary channel)
+        /// 20 MHz channel width (no secondary channel).
+        /// Most common for older devices or crowded areas.
         case none = 0
 
-        /// 40 MHz channel width, secondary channel is **above** the primary channel
+        /// 40 MHz channel width, secondary channel is **above** the primary channel.
+        /// Like adding a lane to the right of your main road.
         case above
 
-        /// 40 MHz channel width, secondary channel is **below** the primary channel
+        /// 40 MHz channel width, secondary channel is **below** the primary channel.
+        /// Adding a lane to the left.
         case below
     }
 }
 
 extension WIFIAccessPointRecord {
-    /// Wi-Fi authentication/security modes
-    /// Matches ESP-IDF's `wifi_auth_mode_t` enum
+    /// Wi-Fi authentication/security modes for connecting to networks.
     enum AuthMode: Int {
         typealias RawValue = Int
 
@@ -68,55 +128,55 @@ extension WIFIAccessPointRecord {
         case open = 0
 
         /// WEP – Wired Equivalent Privacy (obsolete and insecure)
-        case wep
+        case wep = 1
 
         /// WPA Personal (TKIP) – Wi-Fi Protected Access with Pre-Shared Key
-        case wpaPsk
+        case wpaPsk = 2
 
         /// WPA2 Personal (CCMP/AES) – Most common modern personal mode
-        case wpa2Psk
+        case wpa2Psk = 3
 
         /// Mixed WPA/WPA2 Personal – Supports both WPA and WPA2 clients
-        case wpaWpa2Psk
+        case wpaWpa2Psk = 4
 
         /// Enterprise mode (802.1X/EAP) – Usually maps to WPA2-Enterprise
         /// Explicit WPA2-Enterprise (same value as .enterprise)
-        case enterprise
+        case enterprise = 5
 
         /// WPA3 Personal (SAE) – Modern, stronger personal authentication
-        case wpa3Psk
+        case wpa3Psk = 6
 
         /// WPA2/WPA3 Personal transition mode – Supports both WPA2 and WPA3
-        case wpa2Wpa3Psk
+        case wpa2Wpa3Psk = 7
 
         /// WAPI Personal – Chinese national standard (rare outside China)
-        case wapiPsk
+        case wapiPsk = 8
 
         /// Opportunistic Wireless Encryption – Open network with per-device encryption
-        case owe
+        case owe = 9
 
         /// WPA3 Enterprise with 192-bit security (Suite B)
-        case wpa3Enterprise192Bit
+        case wpa3Enterprise192Bit = 10
 
         /// WPA3 Personal (extended PSK) – Deprecated – use `wpa3Psk` instead
         /// Will yield the same result as `wpa3Psk`
-        case wpa3ExtendedPsk
+        case wpa3ExtendedPsk = 11
 
         /// WPA3 Personal mixed mode (extended PSK) – Deprecated – use `wpa3Psk` instead
         /// Will yield the same result as `wpa3Psk`
-        case wpa3ExtendedPskMixedMode
+        case wpa3ExtendedPskMixedMode = 12
 
         /// Device Provisioning Protocol – For easy device onboarding
-        case dpp
+        case dpp = 13
 
         /// WPA3 Enterprise Only – Strict WPA3-Enterprise (no WPA2 fallback)
-        case wpa3Enterprise
+        case wpa3Enterprise = 14
 
         /// WPA2/WPA3 Enterprise transition mode – Supports both
-        case wpa2Wpa3Enterprise
+        case wpa2Wpa3Enterprise = 15
 
         /// WPA Enterprise – Older enterprise mode (rarely used today)
-        case wpaEnterprise
+        case wpaEnterprise = 16
 
         /// Sentinel value – maximum valid authentication mode
         /// (not a real mode, used internally)
@@ -148,8 +208,7 @@ extension WIFIAccessPointRecord {
 }
 
 extension WIFIAccessPointRecord {
-    /// Wi-Fi cipher (encryption) type
-    /// Matches ESP-IDF's `wifi_cipher_type_t` enum
+    /// Wi-Fi cipher (encryption) types for securing data.
     enum CipherType: Int {
         typealias RawValue = Int
 
@@ -217,8 +276,7 @@ extension WIFIAccessPointRecord {
 }
 
 extension WIFIAccessPointRecord {
-    /// Wi-Fi channel bandwidth modes
-    /// Matches ESP-IDF's `wifi_bandwidth_t` enum
+    /// Wi-Fi channel bandwidth modes for data throughput.
     enum Bandwidth: Int {
         typealias RawValue = Int
 
@@ -254,19 +312,113 @@ extension WIFIAccessPointRecord {
 }
 
 extension WIFIAccessPointRecord {
+    /// Bit flags for Wi-Fi PHY modes and features supported by the AP.
     struct PHYFlags: OptionSet {
+        /// The raw integer value representing the combined flags.
         let rawValue: Int
 
-        // Individual flags (bit positions match ESP-IDF)
+        /// Supports 802.11b (old, slow, but compatible).
         static let mode11b = PHYFlags(rawValue: 1 << 0)
+
+        /// Supports 802.11g (faster than b, common in 2.4GHz).
         static let mode11g = PHYFlags(rawValue: 1 << 1)
+
+        /// Supports 802.11n (Wi-Fi 4, with MIMO for speed).
         static let mode11n = PHYFlags(rawValue: 1 << 2)
+
+        /// Low-rate mode enabled (for power-saving or compatibility).
         static let lowRate = PHYFlags(rawValue: 1 << 3)
-        static let mode11a = PHYFlags(rawValue: 1 << 4)  // Sometimes mislabeled in docs
+
+        /// Supports 802.11a (5GHz only, less interference).
+        static let mode11a = PHYFlags(rawValue: 1 << 4)
+
+        /// Supports 802.11ac (Wi-Fi 5, fast in 5GHz).
         static let mode11ac = PHYFlags(rawValue: 1 << 5)
+
+        /// Supports 802.11ax (Wi-Fi 6, modern and efficient).
         static let mode11ax = PHYFlags(rawValue: 1 << 6)
+
+        /// Wi-Fi Protected Setup (WPS) is supported for easy pairing.
         static let wps = PHYFlags(rawValue: 1 << 7)
+
+        /// Fine Time Measurement (FTM) responder mode (for location services).
         static let ftmResponder = PHYFlags(rawValue: 1 << 8)
+
+        /// Fine Time Measurement (FTM) initiator mode.
         static let ftmInitiator = PHYFlags(rawValue: 1 << 9)
+    }
+}
+
+extension WIFIAccessPointRecord {
+    /// Policies for how Wi-Fi country settings are applied.
+    /// Mirrors ESP-IDF's `wifi_country_policy_t`.
+    enum CountryPolicy: Int {
+        /// Auto: Use the country's rules from the connected AP.
+        /// Like asking the local expert instead of guessing.
+        case auto = 0
+
+        /// Manual: Always use the configured country settings.
+        /// Stick to your own rules, no matter what.
+        case manual
+    }
+}
+
+extension WIFIAccessPointRecord {
+    /// Country-specific Wi-Fi regulations and settings.
+    struct WIFICountry {
+        /// Country code as a string (e.g., "US", "JP").
+        let countryCode: String
+
+        /// Starting channel for allowed 2.4GHz Wi-Fi (usually 1).
+        let startChannel: Int
+
+        /// Total number of allowed 2.4GHz channels.
+        let totalChannels: Int
+
+        /// Maximum transmit power in dBm.
+        let maxTxPower: Int
+
+        /// Policy for applying these rules (auto or manual).
+        let policy: CountryPolicy
+
+        /// Bitmask for allowed 5GHz channels (if supported).
+        let wifi5GChannelMask: Int?
+
+        init(_ country: wifi_country_t) {
+            let ccArray: [CChar] = withUnsafeBytes(of: country.cc) { buffer in
+                Array(buffer.bindMemory(to: CChar.self))
+            }
+            self.countryCode = String(cString: ccArray)
+            self.startChannel = Int(country.schan)
+            self.totalChannels = Int(country.nchan)
+            self.maxTxPower = Int(country.max_tx_power)
+            self.policy = CountryPolicy(rawValue: Int(country.policy.rawValue)) ?? .auto
+            self.wifi5GChannelMask = nil  // 5G channel mask not available for esp32c6
+        }
+    }
+}
+
+extension WIFIAccessPointRecord {
+    /// High-Efficiency (Wi-Fi 6) AP information.
+    struct HEAPInfo {
+        /// BSS color value (0-63) for identifying the network.
+        let bssColor: Int
+
+        /// Whether AID assignment uses partial BSS color.
+        let partialBssColor: Bool
+
+        /// If BSS color usage is disabled.
+        let bssColorDisabled: Bool
+
+        /// Index for non-transmitted BSSID in M-BSSID sets.
+        let bssidIndex: Int
+
+        /// Initializes from ESP-IDF's C struct.
+        init(_ he_ap: wifi_he_ap_info_t) {
+            self.bssColor = Int(he_ap.bss_color)
+            self.partialBssColor = he_ap.partial_bss_color != 0
+            self.bssColorDisabled = he_ap.bss_color_disabled != 0
+            self.bssidIndex = Int(he_ap.bssid_index)
+        }
     }
 }

@@ -1,14 +1,11 @@
 /// The entry point of the application, executed by ESP-IDF's runtime.
 ///
-/// This function initializes the ESP32 chip, prints a greeting, initializes the temperature sensor,
-/// and enters an infinite loop that reads and prints the temperature every 500ms.
+/// This function initializes the ESP32 chip, prints a greeting, scans for nearby Wi-Fi access points,
+/// and prints their details (SSID, MAC address, channel, RSSI, authentication mode, and cipher).
+/// The program demonstrates Wi-Fi scanning using the `WIFIScanner` struct.
 ///
-/// The program demonstrates temperature sensor reading using the `TemperatureReader` struct.
-///
-/// - Important: This loop runs indefinitely. To exit, reset or power cycle the device.
-//
-//
-
+/// - Note: The scan is performed once and the program exits. For continuous operation, modify the code.
+/// - Important: Ensure the ESP32-C6 is properly set up with ESP-IDF and Swift toolchain before running.
 @_cdecl("app_main")
 func main() {
     let chipInformation = ChipInformation()
@@ -25,10 +22,5 @@ func main() {
         print("AuthMode \t\(accessPoint.authMode.description)")
         print("Cipher \t\t\(accessPoint.pairwiseCipher.description)")
         print("")
-    }
-
-    while true {
-
-        vTaskDelay(500 / (1000 / UInt32(configTICK_RATE_HZ)))
     }
 }

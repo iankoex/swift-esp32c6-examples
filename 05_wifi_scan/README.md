@@ -1,6 +1,6 @@
-# ESP32-C6 Temperature Reading Demo with Swift
+# ESP32-C6 Wi-Fi Scanning Demo with Swift
 
-This example demonstrates how to read temperature data from the ESP32-C6's built-in temperature sensor using Swift code that bridges to the ESP-IDF SDK's C APIs. This example is specifically made for the RISC-V MCUs from ESP32 (the Xtensa MCUs are not currently supported by Swift).
+This example demonstrates how to scan for nearby Wi-Fi access points on the ESP32-C6 using Swift code that bridges to the ESP-IDF SDK's C APIs. This example is specifically made for the RISC-V MCUs from ESP32 (the Xtensa MCUs are not currently supported by Swift).
 
 ## Requirements
 
@@ -31,13 +31,55 @@ $ idf.py build
 $ idf.py flash monitor
 ```
 
-- The program will continuously read and print the temperature in Celsius every 500ms, with status messages printed to the console/serial output.
+- The program will scan for nearby Wi-Fi access points and print their details (SSID, BSSID, channel, RSSI, auth mode, cipher), then exit.
 - To exit the monitor, press `ctrl+]` or `ctrl+t` followed by `ctrl+x`.
 
-## Displaying Errors from C in Embedded Swift
+## Converting C Arrays (uint8_t) to Swift Strings
 
-In this demo, errors from ESP-IDF C APIs are handled by extending the `esp_err_t` type to conform to Swift's `Error` protocol. This allows C error codes to be thrown as Swift errors and caught in `do-catch` blocks. The extension provides a `description` property that converts the error code to a human-readable string using `esp_err_to_name`.
+When interfacing with C APIs in ESP-IDF, data like SSIDs or BSSIDs are often represented as fixed-size arrays of `uint8_t` (e.g., `char ssid[32]`). In Swift, these are imported as tuples (e.g., `(UInt8, UInt8, ..., UInt8)` for a fixed size). To convert them to usable Swift strings or hex representations:
 
-## Why Typed Throws
+### To a Valid String (e.g., SSID)
+Use `withUnsafeBytes` to bind the tuple to an array of `UInt8`, then create a `String` from the C string:
 
-Embedded Swift restricts error handling to typed throws only, as untyped throws are not supported in constrained environments. Typed throws ensure type safety and allow specifying the exact error type (in this case, `esp_err_t`) that can be thrown. This is explained in more detail in the [Embedded Restrictions documentation](https://docs.swift.org/compiler/documentation/diagnostics/embedded-restrictions/).
+```swift
+let ssidArray: [UInt8] = withUnsafeBytes(of: wifi_ap_record.ssid) { buffer in
+    Array(buffer.bindMemory(to: UInt8.self))
+}
+let ssid = String(cString: ssidArray)
+```
+
+This assumes the array is null-terminated, as is common for C strings.
+
+### To Hex String (e.g., BSSID)
+Map each byte to its hexadecimal string representation and join:
+
+```swift
+let bssidArray: [UInt8] = withUnsafeBytes(of: wifi_ap_record.bssid) { buffer in
+    Array(buffer.bindMemory(to: UInt8.self))
+}
+let bssidHex = bssidArray.map { String($0, radix: 16, uppercase: true) }.joined()
+```
+
+This produces a string like "AABBCCDDEEFF" for MAC addresses.
+
+## Workaround for Calling Complex C Macros in Swift
+
+ESP-IDF uses complex macros (e.g., `WIFI_INIT_CONFIG_DEFAULT()`) that expand to struct initializers or expressions, which cannot be directly used in Swift due to limitations of Embedded Swift.
+As a workaround, define a C shim function that assigns the macro to a variable and returns it.
+
+For example, in `BridgingHeader.h`:
+
+```c
+static inline wifi_init_config_t shim_wifi_init_config(void) {
+  wifi_init_config_t config = WIFI_INIT_CONFIG_DEFAULT();
+  return config;
+}
+```
+
+Then, in Swift, call the shim:
+
+```swift
+var wifi_config: wifi_init_config_t = shim_wifi_init_config()
+```
+
+This approach ensures compatibility while avoiding direct macro usage. Use similar shims for other complex macros that aren't simple constants.
