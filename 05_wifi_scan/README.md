@@ -36,7 +36,7 @@ $ idf.py flash monitor
 
 ## Converting C Arrays (uint8_t) to Swift Strings
 
-When interfacing with C APIs in ESP-IDF, data like SSIDs or BSSIDs are often represented as fixed-size arrays of `uint8_t` (e.g., `char ssid[32]`). In Swift, these are imported as tuples (e.g., `(UInt8, UInt8, ..., UInt8)` for a fixed size). To convert them to usable Swift strings or hex representations:
+When interfacing with C APIs in ESP-IDF, data like SSIDs or BSSIDs are often represented as fixed-size arrays of `uint8_t` (e.g., `uint8_t ssid[32]`). In Swift, these are imported as tuples (e.g., `(UInt8, UInt8, ..., UInt8)` for a fixed size). To convert them to usable Swift strings or hex representations:
 
 ### To a Valid String (e.g., SSID)
 Use `withUnsafeBytes` to bind the tuple to an array of `UInt8`, then create a `String` from the C string:
