@@ -63,6 +63,60 @@ let customLogger = Logger(label: "Custom", configuration: config)
 customLogger.debug("This will show with custom settings")
 ```
 
-## Workaround for ESP-IDF Logging Integration
+## Embedded Swift Printing Limitations
 
-ESP-IDF's logging functions require specific configuration structures. The code uses shim functions (defined in C) to interface with ESP-IDF's `esp_log` API, allowing Swift code to set log levels and configurations per message. This ensures compatibility with Embedded Swift limitations while providing full logging functionality.
+Embedded Swift (as of the current snapshot) has limited support for certain standard library features, particularly around string interpolation and protocol conformances. This affects logging and debugging, especially when printing complex types like arrays.
+
+### Why Can't You Just Log Types?
+
+Most primitives extended by `ExpressibleByStringLiteral` and `ExpressibleByStringInterpolation` are unavailable in embedded Swift. Attempting to print arrays or use string interpolation with collections results in runtime errors:
+
+```swift
+let items = [1, 2, 3]
+print(items) // Error: Conformance of 'Array<Element>' to 'CustomStringConvertible' is unavailable: unavailable in embedded Swift (SourceKit)
+print("array contents: \(array)")  // will print but console will show: "array contents (cannot print value in embedded Swift)"
+```
+
+### Workarounds and Solutions
+
+- **Manual Formatting**: Loop through elements or use custom formatting:
+  ```swift
+  print("array: [" + array.map { String($0) }.joined(separator: ", ") + "]")
+  ```
+
+### Logging with Types
+
+Embedded Swift's limitations also impact logging with complex types. You can't log arrays or collections directly using string interpolation:
+
+```swift
+let items = [1, 2, 3]
+logger.info("array contents: \(items)")  // Will print, but console shows: "I (280) example: items: (cannot print value in embedded Swift) • main() Main.swift:30"
+```
+
+Reimplementing `CustomStringConvertible` for all types is overkill, so the Logger requires you to provide a pre-formatted string instead.
+
+Note: `ESP_LOG_LEVEL_LOCAL` can take variadic arguments, and `CVaListPointer` is available in embedded Swift, but `withVaList` doesn't work for some reason. We hope embedded Swift gains this support soon.
+
+## Error Handling
+
+This project demonstrates error handling in Swift for ESP32-C6, adapting ESP-IDF's robust error mechanisms to embedded Swift's constraints. Errors are primarily managed through `esp_err_t` return codes, with utilities in `Utilities.swift` providing safe checking and reporting.
+
+### Key Features
+
+- **Error Checking**: Use `withErrorChecking` for fatal errors, evaluating expressions and aborting on failure with descriptive messages.
+- **Error Descriptions**: The `esp_err_t` extension conforms to `Error`, using `esp_err_to_name_r` for human-readable strings.
+- **Logging Integration**: Combine with the `Logger` class to log errors at appropriate levels, avoiding interpolation issues.
+
+### Basic Usage
+
+```swift
+// Check for errors and abort if failed
+withErrorChecking { someESPFunction() }
+
+// Log errors gracefully
+if let error = someESPFunction(), error != ESP_OK {
+    logger.error("Error: \(error.description)")
+}
+```
+
+See `Utilities.swift` for API details and ESP-IDF's [Error Handling Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/error-handling.html) for context.

@@ -19,10 +19,8 @@
 #include "freertos/FreeRTOS.h" // IWYU pragma: keep - Provides FreeRTOS types that may be indirectly referenced in ESP-IDF APIs
 
 #include "esp_chip_info.h" // IWYU pragma: keep - Needed for esp_chip_info_t and related functions used in ChipInformation.swift
-
-#include "sdkconfig.h" // IWYU pragma: keep - Contains SDK configuration definitions used in ChipInformation.swift
-
 #include "esp_log.h" // IWYU pragma: keep - Essential for esp_log_config_t and ESP_LOG_LEVEL_LOCAL macro used in Logger.swift
+#include "sdkconfig.h" // IWYU pragma: keep - Contains SDK configuration definitions used in ChipInformation.swift
 
 // Prevent multiple inclusions of this header
 #pragma once

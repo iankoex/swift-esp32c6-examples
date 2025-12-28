@@ -25,4 +25,8 @@ func main() {
     logger.debug("debug")
     logger.verbose("verbose")
     logger.log(level: .none, message: "none")
+
+    let items = [1, 2, 3]
+    logger.info("items: \(items)")
+
 }

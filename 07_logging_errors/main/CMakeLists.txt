@@ -63,6 +63,7 @@ target_sources(${COMPONENT_LIB}
     Main.swift
     ChipInformation.swift
     Logger.swift
+    Utilities.swift
 )
 
 add_custom_command(
