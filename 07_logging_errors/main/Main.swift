@@ -27,6 +27,6 @@ func main() {
     logger.log(level: .none, message: "none")
 
     let items = [1, 2, 3]
-    logger.info("items: \(items)")
+    logger.info("items: \(items)")  // will print 'I (279) example: items: (cannot print value in embedded Swift) • main() Main.swift:30'
 
 }
