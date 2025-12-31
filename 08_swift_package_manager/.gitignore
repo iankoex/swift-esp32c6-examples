@@ -2,7 +2,6 @@
 .cache
 build
 .swiftpm
-module.modulemap
 dependencies.lock
 diagram.json
 .DS_Store

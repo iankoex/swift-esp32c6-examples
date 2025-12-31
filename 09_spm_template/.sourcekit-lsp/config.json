@@ -1,0 +1,30 @@
+{
+    "swiftPM": {
+        "configuration": "release",
+        "triple": "c",
+        "traits": [
+            "Embedded"
+        ],
+        "cCompilerFlags": [
+            "-march=rv32imac_zicsr_zifencei",
+            "-mabi=ilp32",
+            "-fno-pic",
+            "-fno-pie",
+            "-D__APPLE__",
+            "-D__MACH__"
+        ],
+        "swiftCompilerFlags": [
+            "-enable-experimental-feature",
+            "Embedded",
+            "-wmo",
+            "-parse-as-library",
+            "-Osize",
+            "-Xfrontend",
+            "-function-sections",
+            "-Xfrontend",
+            "-enable-single-module-llvm-emission",
+            "-Xfrontend",
+            "-disable-stack-protector"
+        ]
+    }
+}

@@ -1,0 +1,9 @@
+.build
+.cache
+build
+.swiftpm
+dependencies.lock
+diagram.json
+.DS_Store
+managed_components*
+sdkconfig*
